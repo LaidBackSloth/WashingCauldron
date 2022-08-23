@@ -1,0 +1,140 @@
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net' }
+        maven { url = 'https://maven.parchmentmc.org' }
+        maven { url = 'https://repo.spongepowered.org/maven' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
+        classpath 'org.parchmentmc:librarian:1.+'
+        classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'org.parchmentmc.librarian.forgegradle'
+apply plugin: 'org.spongepowered.mixin'
+
+version = "forge-${project.mod_version}-${project.minecraft_version}"
+group = "com.laidbacksloth.${project.mod_id}"
+archivesBaseName = project.mod_id
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+mixin {
+    add sourceSets.main, "${project.mod_id}.refmap.json"
+}
+
+minecraft {
+    mappings channel: project.mappings_channel, version: project.mappings_version
+    // accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            arg "-mixin.config=${project.mod_id}.mixins.json"
+            mods {
+                modtemplate {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            arg "-mixin.config=${project.mod_id}.mixins.json"
+            mods {
+                modtemplate {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            args '--mod', 'modtemplate', '--all', '--output', file('src/generated/resources/')
+            mods {
+                modtemplate {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+dependencies {
+    minecraft project.forge_version
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+    // compile against the JEI API but do not include it at runtime
+    compileOnly(fg.deobf("mezz.jei:jei-${project.minecraft_version}-common-api:${project.jei_version}"))
+    compileOnly(fg.deobf("mezz.jei:jei-${project.minecraft_version}-forge-api:${project.jei_version}"))
+    // at runtime, use the full JEI jar for Forge
+    runtimeOnly(fg.deobf("mezz.jei:jei-${project.minecraft_version}-forge:${project.jei_version}"))
+}
+
+jar {
+    manifest {
+        attributes([
+                "Specification-Title"     : project.mod_name,
+                "Specification-Vendor"    : "LaidBackSloth",
+                "Specification-Version"   : project.mod_version,
+                "Implementation-Title"    : project.mod_name,
+                "Implementation-Version"  : project.mod_version,
+                "Implementation-Vendor"   : "LaidBackSloth",
+                "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+                "TweakClass": "org.spongepowered.asm.launch.MixinTweaker",
+                "TweakOrder": 0,
+                "MixinConfigs": "${project.mod_id}.mixins.json"
+        ])
+    }
+}
+
+processResources {
+    Map<String, ?> ex = new HashMap<>()
+    ex.put("id", project.mod_id)
+    ex.put("name", project.mod_name)
+    ex.put("version", project.mod_version)
+    ex.put("description", project.mod_description)
+    ex.put("main", project.main_name)
+    ex.put("curseforge", project.curseforge_name)
+    ex.put("minecraftVersion", project.minecraft_version)
+    ex.put("minForgeVersion", project.forge_version_min)
+    ex.put("nextMinecraftVersion", project.minecraft_version_next)
+
+    filesMatching("META-INF/mods.toml") {
+        expand(ex)
+    }
+
+    filesMatching("${project.mod_id}.mixins.json") {
+        expand(ex)
+    }
+
+    filesMatching("pack.mcmeta") {
+        expand(ex)
+    }
+}
+
+repositories {
+    maven { url = 'https://libraries.minecraft.net/' }
+    mavenCentral()
+    maven { url = 'https://maven.minecraftforge.net/' }
+    maven {
+        // location of the maven that hosts JEI files
+        name = "Progwml6 maven"
+        url = "https://dvs1.progwml6.com/files/maven/"
+    }
+    maven {
+        // location of a maven mirror for JEI files, as a fallback
+        name = "ModMaven"
+        url = "https://modmaven.dev"
+    }
+}
